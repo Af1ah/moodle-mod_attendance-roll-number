@@ -891,6 +891,14 @@ class mod_attendance_structure {
             $orderby = $DB->sql_fullname('u.firstname', 'u.lastname') . ', u.id';
         } else if ($this->pageparams->sort == ATT_SORT_LASTNAME) {
             $orderby = 'u.lastname, u.firstname, u.id';
+        } else if ($this->pageparams->sort == ATT_SORT_IDNUMBER_ASC) {
+            $emptyidnumber = "CASE WHEN u.idnumber IS NULL OR u.idnumber = '' THEN 1 ELSE 0 END";
+            $orderby = "$emptyidnumber ASC, " . $DB->sql_length('u.idnumber') .
+                ' ASC, u.idnumber ASC, u.id ASC';
+        } else if ($this->pageparams->sort == ATT_SORT_IDNUMBER_DESC) {
+            $emptyidnumber = "CASE WHEN u.idnumber IS NULL OR u.idnumber = '' THEN 1 ELSE 0 END";
+            $orderby = "$emptyidnumber ASC, " . $DB->sql_length('u.idnumber') .
+                ' DESC, u.idnumber DESC, u.id ASC';
         } else {
             [$orderby, $sortparams] = users_order_by_sql('u');
         }

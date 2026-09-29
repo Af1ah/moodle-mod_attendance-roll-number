@@ -50,6 +50,8 @@ use js_writer;
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class renderer extends plugin_renderer_base {
+    use mobile_renderer_trait;
+
     // External API - methods to render attendance renderable components.
 
     /**
@@ -325,7 +327,7 @@ class renderer extends plugin_renderer_base {
      * @param manage_data $sessdata to display
      * @return string html code
      */
-    protected function render_manage_data(manage_data $sessdata) {
+    protected function render_legacy_manage_data(manage_data $sessdata) {
         $o = $this->render_sess_manage_table($sessdata) . $this->render_sess_manage_control($sessdata);
         $o = html_writer::tag('form', $o, ['method' => 'post', 'action' => $sessdata->url_sessions()->out()]);
         $o = $this->output->container($o, 'generalbox attwidth');
@@ -340,7 +342,7 @@ class renderer extends plugin_renderer_base {
      * @param manage_data $sessdata
      * @return string
      */
-    protected function render_sess_manage_table(manage_data $sessdata) {
+    protected function render_legacy_sess_manage_table(manage_data $sessdata) {
         $this->page->requires->js_init_call('M.mod_attendance.init_manage');
 
         $table = new html_table();
@@ -489,7 +491,7 @@ class renderer extends plugin_renderer_base {
      * @param manage_data $sessdata
      * @return string
      */
-    protected function render_sess_manage_control(manage_data $sessdata) {
+    protected function render_legacy_sess_manage_control(manage_data $sessdata) {
         $table = new html_table();
         $table->attributes['class'] = 'table-reboot generaltable';
 
@@ -539,7 +541,7 @@ class renderer extends plugin_renderer_base {
      * @param take_data $takedata
      * @return string
      */
-    protected function render_take_data(take_data $takedata) {
+    protected function render_legacy_take_data(take_data $takedata) {
         $controls = $this->render_attendance_take_controls($takedata);
         $table = html_writer::start_div('no-overflow');
         if ($takedata->pageparams->viewmode == mod_attendance_take_page_params::SORTED_LIST) {
@@ -586,7 +588,7 @@ class renderer extends plugin_renderer_base {
      * @param take_data $takedata
      * @return string
      */
-    protected function render_attendance_take_controls(take_data $takedata) {
+    protected function render_legacy_attendance_take_controls(take_data $takedata) {
 
         $urlparams = ['id' => $takedata->cm->id,
             'sessionid' => $takedata->pageparams->sessionid,
@@ -794,7 +796,7 @@ class renderer extends plugin_renderer_base {
      * @param take_data $takedata
      * @return string
      */
-    protected function render_attendance_take_list(take_data $takedata) {
+    protected function render_legacy_attendance_take_list(take_data $takedata) {
         global $CFG;
         $table = new html_table();
         $table->head = [

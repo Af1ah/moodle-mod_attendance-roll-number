@@ -214,6 +214,381 @@
     font-size: smaller;
     font-style: italic;
 }
+
+/* Mobile-first attendance interface. Kept in the activity so it works with every theme. */
+.path-mod-attendance .cursor-pointer {
+    cursor: pointer;
+}
+
+.path-mod-attendance .bg-primary-subtle {
+    background-color: #e7f1ff !important;
+    color: #0d6efd !important;
+}
+
+.path-mod-attendance .bg-danger-subtle {
+    background-color: #f8d7da !important;
+    color: #842029 !important;
+}
+
+.path-mod-attendance .takecontrols {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.75rem;
+    background: #fff;
+}
+
+.path-mod-attendance .takecontrols .card-title {
+    color: #212529;
+    font-size: 1.1rem;
+}
+
+.path-mod-attendance .takecontrols .singleselect select {
+    padding: 0.375rem 1.75rem 0.375rem 0.75rem;
+    border-color: #dee2e6;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.path-mod-attendance .attendance-table-container {
+    max-width: 100%;
+}
+
+.path-mod-attendance .attendance-table-container .table-responsive {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 0.75rem;
+    background: #fff;
+}
+
+.path-mod-attendance .takelist.attendance-single-status {
+    width: 100%;
+    min-width: 42rem;
+    margin-bottom: 0;
+    table-layout: auto;
+    background: #fff;
+}
+
+.path-mod-attendance .takelist.attendance-single-status thead th {
+    padding: 0.75rem 0.875rem;
+    border-bottom: 2px solid #e9ecef;
+    background-color: #f8f9fa;
+    color: #495057;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.path-mod-attendance .takelist.attendance-single-status tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+.path-mod-attendance .takelist.attendance-single-status tbody tr:hover {
+    background-color: #f8f9fc;
+}
+
+.path-mod-attendance .takelist.attendance-single-status td {
+    padding: 0.625rem 0.875rem;
+}
+
+.path-mod-attendance .takelist.attendance-single-status .att-idnumber-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: 1%;
+    min-width: 4.5rem;
+    background: inherit;
+    white-space: nowrap;
+}
+
+.path-mod-attendance .takelist.attendance-single-status thead .att-idnumber-col,
+.path-mod-attendance .takelist.attendance-single-status .setallstatusesrow .att-idnumber-col {
+    z-index: 3;
+    background: #f8f9fa;
+}
+
+.path-mod-attendance .takelist.attendance-single-status .att-name-col {
+    min-width: 11rem;
+    white-space: nowrap;
+}
+
+.path-mod-attendance .takelist.attendance-single-status .att-idnumber-sort {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.path-mod-attendance .takelist.attendance-single-status .att-sort-indicator {
+    font-size: 0.875em;
+    line-height: 1;
+}
+
+.path-mod-attendance .takelist.attendance-single-status .userpicture {
+    flex: 0 0 auto;
+    margin-right: 0.625rem;
+    border-radius: 50%;
+}
+
+.path-mod-attendance .takelist.attendance-single-status .remarks-input {
+    width: clamp(11rem, 22vw, 16rem);
+    border: 1px solid #ced4da;
+    border-radius: 0.4rem;
+    font-size: 0.875rem;
+}
+
+.path-mod-attendance .att-mobile-cycle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.25rem;
+    min-height: 2.75rem;
+    padding: 0.25rem 0.75rem;
+    border: 2px solid;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.path-mod-attendance .att-mobile-cycle-btn:hover,
+.path-mod-attendance .att-mobile-cycle-btn:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.path-mod-attendance .att-mobile-cycle-btn:focus-visible,
+.path-mod-attendance .att-mobile-setall-btn:focus-visible,
+.path-mod-attendance .attendance-session-card:focus-within {
+    outline: 3px solid rgba(13, 110, 253, 0.3);
+    outline-offset: 2px;
+}
+
+.path-mod-attendance .att-mobile-setall-btn {
+    min-height: 2.75rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.4rem;
+    font-size: 0.8125rem;
+}
+
+.path-mod-attendance .att-mobile-pulse {
+    animation: attendance-status-pulse 0.25s ease-in-out;
+}
+
+.path-mod-attendance .attendance-submit-bar {
+    position: sticky;
+    bottom: 0.75rem;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.path-mod-attendance .attendance-submit-bar input {
+    min-height: 2.75rem;
+    pointer-events: auto;
+}
+
+.path-mod-attendance .attendance-session-tiles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.path-mod-attendance .attendance-session-card {
+    position: relative;
+    z-index: 1;
+    border: 1px solid #e9ecef;
+    border-radius: 0.625rem;
+    background: #fff;
+    user-select: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.path-mod-attendance .attendance-session-card:hover {
+    z-index: 5;
+    border-color: #ced4da;
+    background-color: #f8f9fa;
+}
+
+.path-mod-attendance .attendance-session-card.has-open-dropdown,
+.path-mod-attendance .attendance-session-card:focus-within {
+    z-index: 1050;
+}
+
+.path-mod-attendance .attendance-session-card .session-tile-content {
+    min-width: 0;
+}
+
+.path-mod-attendance .attendance-session-card .form-check-input {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+}
+
+.path-mod-attendance .attendance-session-card .session-kebab-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid transparent;
+    color: #6c757d;
+}
+
+.path-mod-attendance .attendance-session-card .dropdown-menu {
+    z-index: 1070;
+    min-width: 11rem;
+    padding: 0.25rem;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    border-radius: 0.625rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+.path-mod-attendance .attendance-session-card .dropdown-item {
+    width: auto;
+    margin: 0.125rem 0.25rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.path-mod-attendance .attendance-manage-bulk-card,
+.path-mod-attendance #attendanceSummaryModal .modal-content {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.75rem;
+    background: #fff;
+}
+
+.path-mod-attendance #attendanceSummaryModal .modal-title,
+.path-mod-attendance #attendanceSummaryModal .summary-total-label,
+.path-mod-attendance #attendanceSummaryModal .summary-total-count {
+    color: #111827 !important;
+    font-weight: 700;
+}
+
+.path-mod-attendance #attendanceSummaryModal .summary-item-label {
+    color: #2d3748 !important;
+    font-weight: 500;
+}
+
+.path-mod-attendance #attendanceSummaryModal .summary-item-count,
+.path-mod-attendance #attendanceSummaryModal .summary-total-count {
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes attendance-status-pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.12);
+    }
+}
+
+@media (max-width: 767.98px) {
+    .path-mod-attendance .takelist.attendance-single-status {
+        width: 100% !important;
+        min-width: 22rem;
+        min-width: max-content;
+        table-layout: fixed;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status th,
+    .path-mod-attendance .takelist.attendance-single-status td {
+        min-width: 0;
+        padding-right: 0.5rem;
+        padding-left: 0.5rem;
+        white-space: nowrap;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status .att-idnumber-col {
+        width: 4.5rem !important;
+        min-width: 4.5rem;
+        max-width: 4.5rem;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status .att-name-col {
+        width: auto !important;
+        min-width: 11rem !important;
+        white-space: normal;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status tbody .att-name-col > .d-flex {
+        min-width: 10rem;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status tbody .att-name-col a {
+        min-width: 0;
+        white-space: normal;
+        overflow-wrap: break-word;
+        word-break: normal;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status .att-status-col {
+        width: 6.5rem !important;
+        min-width: 6.5rem;
+        max-width: 6.5rem;
+        white-space: nowrap;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status .att-extra-identity-col {
+        display: none;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status thead .att-name-col,
+    .path-mod-attendance .takelist.attendance-single-status .setallstatusesrow .att-name-col > * {
+        font-size: 0;
+    }
+
+    .path-mod-attendance .takelist.attendance-single-status .att-remarks-col,
+    .path-mod-attendance .takelist.attendance-single-status thead th:last-child {
+        display: none !important;
+    }
+
+    .path-mod-attendance .takecontrols .card-body,
+    .path-mod-attendance .attendance-session-card {
+        align-items: flex-start !important;
+    }
+
+    .path-mod-attendance .attendance-session-card {
+        flex-wrap: wrap;
+        padding: 0.875rem !important;
+    }
+
+    .path-mod-attendance .attendance-session-card .session-tile-actions {
+        margin-left: auto !important;
+    }
+
+    .path-mod-attendance .attendance-manage-bulk-card {
+        align-items: stretch !important;
+    }
+
+    .path-mod-attendance .attendance-manage-bulk-card .manage-control-right,
+    .path-mod-attendance .attendance-manage-bulk-card .manage-control-right > div {
+        width: 100%;
+        margin-left: 0 !important;
+    }
+
+    .path-mod-attendance .attendance-manage-bulk-card select {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .path-mod-attendance .att-mobile-cycle-btn,
+    .path-mod-attendance .attendance-session-card {
+        transition: none;
+    }
+
+    .path-mod-attendance .att-mobile-pulse {
+        animation: none;
+    }
+}
 #page-mod-attendance-sessions .statusgroup .statusdesc {
     margin-right: 12px;
 }
