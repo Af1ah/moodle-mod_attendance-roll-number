@@ -217,82 +217,198 @@ trait mobile_renderer_trait {
             return $controls . $form;
         }
 
-        // Confirm the current page before saving. Pagination remains server-side.
-        $modalHeader = html_writer::div(
-            html_writer::div(
-                html_writer::tag('h6', get_string('attendancesummary', 'attendance'), [
-                    'class' => 'modal-title fw-bold mb-0 text-dark',
-                    'id' => 'attendanceSummaryModalLabel',
-                ]) . (!empty($takedata->sessioninfo->sessdate) ? html_writer::span(
-                    userdate($takedata->sessioninfo->sessdate, get_string('strftimedate')),
-                    'text-muted small'
-                ) : ''),
-                'd-flex flex-column'
-            ) .
-            html_writer::tag('button', '', [
-                'type' => 'button',
-                'class' => 'btn-close ms-auto',
-                'data-bs-dismiss' => 'modal',
-                'data-dismiss' => 'modal',
-                'aria-label' => get_string('calclose', 'attendance'),
-            ]),
-            'modal-header border-bottom py-3 px-4'
+        // Moodle core/modal receives renderer-created content and provides focus management.
+        $summarytitle = html_writer::div(
+            get_string('attendancesummary', 'attendance') .
+            (!empty($takedata->sessioninfo->sessdate) ? html_writer::span(
+                userdate($takedata->sessioninfo->sessdate, get_string('strftimedate')),
+                'd-block text-muted small'
+            ) : '')
         );
-        $modalBody = html_writer::div(
-            html_writer::div('', 'attendance-summary-list', ['id' => 'attendanceSummaryContent']),
-            'modal-body py-2 px-4'
-        );
-        $modalFooter = html_writer::div(
+        $summaryfooter = html_writer::div(
             html_writer::tag('button', get_string('cancel'), [
                 'type' => 'button',
                 'class' => 'btn btn-sm btn-outline-secondary px-3',
-                'data-bs-dismiss' => 'modal',
-                'data-dismiss' => 'modal',
+                'data-action' => 'hide',
             ]) . html_writer::tag('button', get_string('save'), [
                 'type' => 'button',
                 'id' => 'attendanceConfirmSaveBtn',
                 'class' => 'btn btn-sm btn-primary px-3 fw-semibold',
             ]),
-            'modal-footer border-top py-2 px-4'
+            'd-flex justify-content-end gap-2'
         );
-        $modalDialog = html_writer::div(
-            html_writer::div($modalHeader . $modalBody . $modalFooter, 'modal-content border-0 shadow-sm rounded-3'),
-            'modal-dialog modal-dialog-centered modal-sm'
-        );
-        $modal = html_writer::div($modalDialog, 'modal fade', [
-            'id' => 'attendanceSummaryModal',
-            'tabindex' => '-1',
-            'aria-labelledby' => 'attendanceSummaryModalLabel',
-            'aria-hidden' => 'true',
+
+        $sortedstatuses = $this->sort_statuses_by_priority($takedata->statuses);
+        $quickmodal = $this->render_quick_attendance_modal($takedata, $sortedstatuses);
+
+        $modalconfig = html_writer::start_div('', [
+            'id' => 'att-take-config',
+            'hidden' => 'hidden',
+            'data-cmid' => (int)$takedata->cm->id,
+            'data-sessionid' => (int)$takedata->pageparams->sessionid,
+            'data-grouptype' => (int)$takedata->pageparams->grouptype,
+            'data-groupid' => (int)($takedata->pageparams->group ?? 0),
+            'data-manageurl' => $takedata->att->url_manage()->out(false),
+            'data-label-markattendance' => get_string('markattendance', 'attendance'),
+            'data-label-pagetotal' => get_string('pagetotal', 'attendance'),
+            'data-label-setallto' => get_string('setallto', 'attendance', '##STATUS##'),
+            'data-label-unmarked' => get_string('unmarked', 'attendance'),
+            'data-label-studentalreadyadded' => get_string('studentalreadyadded', 'attendance', '##ID##'),
+            'data-label-pleaseenteridnumber' => get_string('pleaseenteridnumber', 'attendance'),
+            'data-label-nostudentsselected' => get_string('nostudentsselected', 'attendance'),
+            'data-label-removestudent' => get_string('removestudent', 'attendance'),
         ]);
+        $modalconfig .= html_writer::tag('template', $summarytitle, ['id' => 'att-summary-title-template']);
+        $modalconfig .= html_writer::tag('template', $summaryfooter, ['id' => 'att-summary-footer-template']);
+        $modalconfig .= html_writer::tag('template', $quickmodal['title'], ['id' => 'att-quick-title-template']);
+        $modalconfig .= html_writer::tag('template', $quickmodal['body'], ['id' => 'att-quick-body-template']);
+        $modalconfig .= html_writer::tag('template', $quickmodal['footer'], ['id' => 'att-quick-footer-template']);
+        $modalconfig .= html_writer::end_div();
 
-        $sortedStatuses = $this->sort_statuses_by_priority($takedata->statuses);
-        $statusespayload = [];
-        $idx = 0;
-        foreach ($sortedStatuses as $st) {
-            $statusespayload[] = [
-                'id' => (string)$st->id,
-                'acronym' => $st->acronym,
-                'description' => $st->description,
-                'colors' => $this->get_status_color_scheme($st, $idx++),
-            ];
-        }
+        $this->page->requires->js_call_amd('mod_attendance/attendance_take', 'init');
 
-        $this->page->requires->js_call_amd('mod_attendance/attendance_take', 'init', [
-            'statuses' => $statusespayload,
-            'labels' => [
-                'markattendance' => get_string('markattendance', 'attendance'),
-                'pagetotal' => get_string('pagetotal', 'attendance'),
-                'setallto' => get_string('setallto', 'attendance', '##STATUS##'),
-                'unmarked' => get_string('unmarked', 'attendance'),
-            ],
-        ]);
-
-        return $controls . $form . $modal;
+        return $controls . $form . $modalconfig;
     }
 
     /**
-     * Render take controls banner (Upload button removed, clean flex layout).
+     * Render Quick Attendance Modal with student search, status dropdowns, and confirmation.
+     *
+     * @param take_data $takedata
+     * @param array $sortedstatuses Ordered status records.
+     * @return array
+     */
+    protected function render_quick_attendance_modal(
+        take_data $takedata,
+        array $sortedstatuses
+    ): array {
+        $quicktitle = get_string('quickattendance', 'attendance');
+        if (!empty($takedata->sessioninfo->sessdate)) {
+            $quicktitle .= html_writer::span(
+                userdate($takedata->sessioninfo->sessdate, get_string('strftimedate')),
+                'd-block text-muted small'
+            );
+        }
+
+        // Keep the client's standard default: selected students are Absent.
+        $defaultabsentid = null;
+        foreach ($sortedstatuses as $st) {
+            $acr = strtoupper(trim($st->acronym ?? ''));
+            $desc = strtolower(trim($st->description ?? ''));
+            if ($defaultabsentid === null && ($acr === 'A' || $acr === 'AB' || str_contains($desc, 'absent'))) {
+                $defaultabsentid = $st->id;
+            }
+        }
+        if ($defaultabsentid === null && !empty($sortedstatuses)) {
+            $defaultabsentid = count($sortedstatuses) > 1 ? $sortedstatuses[1]->id : $sortedstatuses[0]->id;
+        }
+
+        // Status options for selected students (default: Absent).
+        $selectedopts = '';
+        foreach ($sortedstatuses as $st) {
+            $attributes = ['value' => $st->id];
+            if ($st->id == $defaultabsentid) {
+                $attributes['selected'] = 'selected';
+            }
+            $selectedopts .= html_writer::tag(
+                'option',
+                s($st->description ?: $st->acronym) . ' (' . s($st->acronym) . ')',
+                $attributes
+            );
+        }
+
+        $quickstatusrow = html_writer::div(
+            html_writer::div(
+                html_writer::tag('label', get_string('statusforselected', 'attendance'), [
+                    'for' => 'att-quick-selected-status',
+                    'class' => 'form-label fw-bold text-dark small mb-1',
+                ]) .
+                html_writer::tag('select', $selectedopts, [
+                    'id' => 'att-quick-selected-status',
+                    'class' => 'form-select form-control form-control-sm',
+                ]),
+                'col-12 mb-2'
+            ),
+            'row mb-2'
+        );
+
+        $quicksearchbox = html_writer::div(
+            html_writer::tag('label', get_string('enteridnumber', 'attendance'), [
+                'for' => 'att-quick-idnumber-input',
+                'class' => 'form-label fw-bold text-dark small mb-1',
+            ]) .
+            html_writer::div(
+                html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'id' => 'att-quick-idnumber-input',
+                    'class' => 'form-control',
+                    'placeholder' => get_string('enteridnumberplaceholder', 'attendance'),
+                    'autocomplete' => 'off',
+                ]) .
+                html_writer::tag('button',
+                    '<i class="fa fa-plus mr-1 me-1"></i> ' . get_string('addstudent', 'attendance'),
+                    [
+                        'type' => 'button',
+                        'id' => 'att-quick-add-btn',
+                        'class' => 'btn btn-primary px-3',
+                    ]
+                ),
+                'input-group'
+            ) .
+            html_writer::div('', 'alert alert-danger py-2 px-3 mt-2 d-none small', [
+                'id' => 'att-quick-error',
+                'role' => 'alert',
+            ]),
+            'mb-3'
+        );
+
+        $quickselectedheader = html_writer::div(
+            html_writer::tag('span', get_string('selectedstudents', 'attendance'), ['class' => 'fw-bold text-dark small']) .
+            html_writer::span('0', 'badge bg-primary badge-primary ms-2 ml-2', ['id' => 'att-quick-selected-count']),
+            'd-flex justify-content-between align-items-center mb-1'
+        );
+
+        $quickselectedlist = html_writer::div(
+            html_writer::div(
+                get_string('nostudentsselected', 'attendance'),
+                'text-muted text-center py-3 small',
+                ['id' => 'att-quick-empty-msg']
+            ) .
+            html_writer::div('', '', ['id' => 'att-quick-items-container']),
+            'att-quick-students-box border rounded bg-white p-2 mb-2',
+            ['id' => 'att-quick-selected-list']
+        );
+
+        $quickbody = html_writer::div(
+            $quickstatusrow . $quicksearchbox . $quickselectedheader . $quickselectedlist,
+            'att-quick-modal-body'
+        );
+
+        $quickfooter = html_writer::div(
+            html_writer::tag('button', get_string('cancel'), [
+                'type' => 'button',
+                'class' => 'btn btn-sm btn-outline-secondary px-3',
+                'data-action' => 'hide',
+            ]) .
+            html_writer::tag('button',
+                '<i class="fa fa-check mr-1 me-1"></i> ' . get_string('saveattendance', 'attendance'),
+                [
+                    'type' => 'button',
+                    'id' => 'att-quick-confirm-save-btn',
+                    'class' => 'btn btn-sm btn-primary px-3 fw-semibold',
+                ]
+            ),
+            'd-flex justify-content-end gap-2'
+        );
+
+        return [
+            'title' => $quicktitle,
+            'body' => $quickbody,
+            'footer' => $quickfooter,
+        ];
+    }
+
+    /**
+     * Render take controls banner with quick attendance button and copy controls.
      *
      * @param take_data $takedata
      * @return string HTML
@@ -305,27 +421,39 @@ trait mobile_renderer_trait {
         $timestr = $starttime . ($sess->duration > 0 ? ' - ' . $endtime : '');
 
         $card = html_writer::start_div('card border-0 shadow-sm mb-4 takecontrols att-mobile-enhanced w-100 overflow-hidden');
-        $cardbodyclasses = 'card-body d-flex flex-column flex-md-row justify-content-between ' .
-            'align-items-md-center gap-3 p-3';
+        $cardbodyclasses = 'card-body p-3';
         $card .= html_writer::start_div($cardbodyclasses);
 
         // Session Information Left Block
         $info = html_writer::start_div('session-info');
         $info .= html_writer::tag(
             'h5',
-            '<i class="fa fa-calendar-check-o text-primary mr-2"></i> ' . $date,
+            '<i class="fa fa-calendar-check-o text-primary mr-2 me-2"></i> ' . $date,
             ['class' => 'card-title mb-1 font-weight-bold']
         );
-        $info .= html_writer::div('<i class="fa fa-clock-o text-muted mr-1"></i> ' . $timestr, 'text-muted small mb-1');
+        $info .= html_writer::div('<i class="fa fa-clock-o text-muted mr-1 me-1"></i> ' . $timestr, 'text-muted small mb-1');
         if (!empty($sess->description)) {
             $info .= html_writer::div(format_text($sess->description), 'text-muted small');
         }
         $info .= html_writer::end_div();
 
-        // Action Controls Right Block (Copy from previous dropdown only)
-        $actions = '';
+        // Action controls: Quick Attendance and Copy from previous.
+        $quickbtn = html_writer::tag(
+            'button',
+            '<i class="fa fa-calendar mr-1 me-1" aria-hidden="true"></i> ' . get_string('quick', 'attendance'),
+            [
+                'type' => 'button',
+                'id' => 'att-quick-attendance-btn',
+                'class' => 'btn btn-outline-primary btn-sm font-weight-bold shadow-sm att-quick-btn',
+                'title' => get_string('quickattendance', 'attendance'),
+                'aria-label' => get_string('quickattendance', 'attendance'),
+            ]
+        );
+
+        $actions = html_writer::start_div('take-controls-actions d-flex flex-wrap align-items-center justify-content-end gap-2');
+        $actions .= $quickbtn;
+
         if (isset($takedata->sessions4copy) && count($takedata->sessions4copy) > 0) {
-            $actions = html_writer::start_div('take-controls-actions d-flex flex-wrap align-items-center gap-2');
             $copyoptions = [];
             foreach ($takedata->sessions4copy as $s) {
                 $sstart = attendance_strftimehm($s->sessdate);
@@ -341,10 +469,12 @@ trait mobile_renderer_trait {
             $select->set_label(get_string('copyfrom', 'attendance'));
             $select->class = 'singleselect inline d-inline-block';
             $actions .= $this->output->render($select);
-            $actions .= html_writer::end_div();
         }
+        $actions .= html_writer::end_div();
 
-        $card .= $info . $actions;
+        $headerrow = html_writer::div($info . $actions, 'd-flex justify-content-between align-items-start gap-2 w-100 flex-wrap');
+
+        $card .= $headerrow;
         $card .= html_writer::end_div(); // card-body
         $card .= html_writer::end_div(); // card
 

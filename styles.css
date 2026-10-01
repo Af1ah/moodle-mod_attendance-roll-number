@@ -457,27 +457,64 @@
 }
 
 .path-mod-attendance .attendance-manage-bulk-card,
-.path-mod-attendance #attendanceSummaryModal .modal-content {
+.path-mod-attendance .att-summary-modal .modal-content {
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 0.75rem;
     background: #fff;
 }
 
-.path-mod-attendance #attendanceSummaryModal .modal-title,
-.path-mod-attendance #attendanceSummaryModal .summary-total-label,
-.path-mod-attendance #attendanceSummaryModal .summary-total-count {
+.path-mod-attendance .att-summary-modal .modal-title,
+.path-mod-attendance .att-summary-modal .summary-total-label,
+.path-mod-attendance .att-summary-modal .summary-total-count {
     color: #111827 !important;
     font-weight: 700;
 }
 
-.path-mod-attendance #attendanceSummaryModal .summary-item-label {
+.path-mod-attendance .att-summary-modal .summary-item-label {
     color: #2d3748 !important;
     font-weight: 500;
 }
 
-.path-mod-attendance #attendanceSummaryModal .summary-item-count,
-.path-mod-attendance #attendanceSummaryModal .summary-total-count {
+.path-mod-attendance .att-summary-modal .summary-item-count,
+.path-mod-attendance .att-summary-modal .summary-total-count {
     font-variant-numeric: tabular-nums;
+}
+
+.path-mod-attendance .att-quick-btn {
+    min-height: 2.25rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.path-mod-attendance .att-quick-modal .modal-content {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.75rem;
+    background: #fff;
+}
+
+.path-mod-attendance .att-quick-modal .modal-title {
+    color: #111827 !important;
+    font-weight: 700;
+}
+
+.path-mod-attendance .att-quick-students-box {
+    min-height: 4rem;
+    max-height: 12.5rem;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background-color: #f8f9fa;
+}
+
+.path-mod-attendance .att-quick-student-item {
+    transition: background-color 0.12s ease;
+}
+
+.path-mod-attendance .att-quick-student-item:hover {
+    background-color: #f1f3f5;
 }
 
 @keyframes attendance-status-pulse {
@@ -492,8 +529,7 @@
 @media (max-width: 767.98px) {
     .path-mod-attendance .takelist.attendance-single-status {
         width: 100% !important;
-        min-width: 22rem;
-        min-width: max-content;
+        min-width: 0;
         table-layout: fixed;
     }
 
@@ -513,19 +549,19 @@
 
     .path-mod-attendance .takelist.attendance-single-status .att-name-col {
         width: auto !important;
-        min-width: 11rem !important;
+        min-width: 0 !important;
         white-space: normal;
     }
 
     .path-mod-attendance .takelist.attendance-single-status tbody .att-name-col > .d-flex {
-        min-width: 10rem;
+        min-width: 0;
     }
 
     .path-mod-attendance .takelist.attendance-single-status tbody .att-name-col a {
         min-width: 0;
         white-space: normal;
-        overflow-wrap: break-word;
-        word-break: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
 
     .path-mod-attendance .takelist.attendance-single-status .att-status-col {

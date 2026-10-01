@@ -816,6 +816,199 @@ class mod_attendance_structure {
     }
 
     /**
+     * Return the IDs of users who may be listed for the requested group.
+     *
+     * This deliberately selects only the user ID so bulk attendance operations do not load
+     * pictures, identity fields, custom profile fields, or enrolment metadata.
+     *
+     * @param int $groupid Group ID, or zero for all permitted users.
+     * @return int[]
+     */
+    public function get_listable_user_ids(int $groupid = 0): array {
+        global $DB;
+
+        $groupids = $groupid;
+        if (!empty($this->cm->groupingid) && $groupid === 0) {
+            $groupids = array_keys(groups_get_all_groups(
+                $this->cm->course,
+                0,
+                $this->cm->groupingid,
+                'g.id'
+            ));
+        }
+
+        [$enrolledsql, $params] = get_enrolled_sql(
+            $this->context,
+            'mod/attendance:canbelisted',
+            $groupids
+        );
+        $userids = array_map('intval', $DB->get_fieldset_sql($enrolledsql, $params));
+
+        // Temporary users are intentionally included by get_users(), regardless of group.
+        $tempuserids = $DB->get_fieldset_select(
+            'attendance_tempusers',
+            'studentid',
+            'courseid = :courseid',
+            ['courseid' => $this->course->id]
+        );
+
+        return array_values(array_unique(array_merge($userids, array_map('intval', $tempuserids))));
+    }
+
+    /**
+     * Save Quick Attendance for every listable student in a class or group.
+     *
+     * Existing remarks are retained. Present and Absent work as complementary statuses.
+     * Any other status is applied only to the selected students.
+     *
+     * @param int[] $selectedstudentids Selected user IDs.
+     * @param int $selectedstatusid Status for selected users.
+     * @param int $groupid Effective group ID.
+     * @return int Number of processed students.
+     */
+    public function take_quick_attendance(
+        array $selectedstudentids,
+        int $selectedstatusid,
+        int $groupid = 0
+    ): int {
+        global $DB, $USER;
+
+        $statuses = $this->get_statuses();
+        if (!isset($statuses[$selectedstatusid])) {
+            throw new invalid_parameter_exception(get_string('invalidstatus', 'attendance'));
+        }
+
+        $userids = $this->get_listable_user_ids($groupid);
+        $allowedlookup = array_fill_keys($userids, true);
+        $selectedstudentids = array_values(array_unique(array_map('intval', $selectedstudentids)));
+        foreach ($selectedstudentids as $studentid) {
+            if (!isset($allowedlookup[$studentid])) {
+                throw new required_capability_exception(
+                    $this->context,
+                    'mod/attendance:takeattendances',
+                    'nopermissions',
+                    ''
+                );
+            }
+        }
+
+        $otherstatusid = $this->get_quick_complement_status_id($statuses, $selectedstatusid);
+        $selectedlookup = array_fill_keys($selectedstudentids, true);
+        $processeduserids = $otherstatusid === null ? $selectedstudentids : $userids;
+        if (!$processeduserids) {
+            return 0;
+        }
+
+        $statusset = implode(',', array_keys($statuses));
+        $now = time();
+        $existinglogs = $this->get_session_log($this->pageparams->sessionid);
+        $newlogs = [];
+        $transaction = $DB->start_delegated_transaction();
+
+        foreach ($processeduserids as $studentid) {
+            $statusid = isset($selectedlookup[$studentid]) ? $selectedstatusid : $otherstatusid;
+            if (isset($existinglogs[$studentid])) {
+                $existinglog = $existinglogs[$studentid];
+                if ((int)$existinglog->statusid !== $statusid || $existinglog->statusset !== $statusset) {
+                    $DB->update_record('attendance_log', (object)[
+                        'id' => $existinglog->id,
+                        'statusid' => $statusid,
+                        'statusset' => $statusset,
+                        'timetaken' => $now,
+                        'takenby' => $USER->id,
+                    ]);
+                }
+                continue;
+            }
+
+            $newlogs[] = (object)[
+                'sessionid' => $this->pageparams->sessionid,
+                'studentid' => $studentid,
+                'statusid' => $statusid,
+                'statusset' => $statusset,
+                'timetaken' => $now,
+                'takenby' => $USER->id,
+                'remarks' => '',
+                'ipaddress' => '',
+            ];
+        }
+
+        if ($newlogs) {
+            $DB->insert_records('attendance_log', $newlogs);
+        }
+
+        $session = $this->get_session_info($this->pageparams->sessionid);
+        $session->lasttaken = $now;
+        $session->lasttakenby = $USER->id;
+        $session->timemodified = $now;
+        $DB->update_record('attendance_sessions', $session);
+
+        if ($this->grade != 0) {
+            $this->update_users_grade($processeduserids);
+        }
+
+        $params = [
+            'sessionid' => $this->pageparams->sessionid,
+            'grouptype' => $this->pageparams->grouptype,
+        ];
+        $event = \mod_attendance\event\attendance_taken::create([
+            'objectid' => $this->id,
+            'context' => $this->context,
+            'other' => $params,
+        ]);
+        $event->add_record_snapshot('course_modules', $this->cm);
+        $event->add_record_snapshot('attendance_sessions', $session);
+        $event->trigger();
+
+        $transaction->allow_commit();
+
+        return count($processeduserids);
+    }
+
+    /**
+     * Return the complementary Present or Absent status for Quick Attendance.
+     *
+     * @param array $statuses Available status records keyed by ID.
+     * @param int $selectedstatusid Selected status ID.
+     * @return int|null Complementary status ID, or null for non-binary statuses.
+     */
+    private function get_quick_complement_status_id(array $statuses, int $selectedstatusid): ?int {
+        $selectedkind = $this->get_quick_status_kind($statuses[$selectedstatusid]);
+        if ($selectedkind === null) {
+            return null;
+        }
+
+        $wantedkind = $selectedkind === 'present' ? 'absent' : 'present';
+        foreach ($statuses as $status) {
+            if ($this->get_quick_status_kind($status) === $wantedkind) {
+                return (int)$status->id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Classify a status used by the complementary Quick Attendance method.
+     *
+     * @param stdClass $status Attendance status record.
+     * @return string|null Present, absent, or null for another status.
+     */
+    private function get_quick_status_kind(stdClass $status): ?string {
+        $acronym = strtoupper(trim($status->acronym ?? ''));
+        $description = strtolower(trim($status->description ?? ''));
+
+        if (in_array($acronym, ['P', 'PR', 'PRE'], true) || str_contains($description, 'present')) {
+            return 'present';
+        }
+        if (in_array($acronym, ['A', 'AB', 'ABS'], true) || str_contains($description, 'absent')) {
+            return 'absent';
+        }
+
+        return null;
+    }
+
+    /**
      * Helper function to save attendance and trigger events.
      *
      * @param array $sesslog

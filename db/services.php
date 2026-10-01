@@ -73,6 +73,22 @@ $functions = [
         'description' => 'Method that retrieves the sessions in an attendance instance.',
         'type'        => 'read',
     ],
+    'mod_attendance_find_student_by_idnumber' => [
+        'classname' => 'mod_attendance\\external\\find_student_by_idnumber',
+        'methodname' => 'execute',
+        'description' => 'Find permitted students by ID number for Quick Attendance.',
+        'type' => 'read',
+        'ajax' => true,
+        'capabilities' => 'mod/attendance:takeattendances,moodle/site:viewuseridentity',
+    ],
+    'mod_attendance_save_quick_attendance' => [
+        'classname' => 'mod_attendance\\external\\save_quick_attendance',
+        'methodname' => 'execute',
+        'description' => 'Save Quick Attendance for a permitted class or group.',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/attendance:takeattendances',
+    ],
 ];
 
 
@@ -88,6 +104,8 @@ $services = [
             'mod_attendance_get_session',
             'mod_attendance_update_user_status',
             'mod_attendance_get_sessions',
+            'mod_attendance_find_student_by_idnumber',
+            'mod_attendance_save_quick_attendance',
         ],
         'restrictedusers' => 0,
         'enabled' => 1,

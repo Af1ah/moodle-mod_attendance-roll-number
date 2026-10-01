@@ -29,7 +29,13 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define(['jquery', 'core/log'], function($, Log) {
+define([
+    'jquery',
+    'core/log',
+    'core/ajax',
+    'core/notification',
+    'core/modal',
+], function($, Log, Ajax, Notification, Modal) {
 
     /** @var {Array} Statuses array sorted by priority (Highest, Lowest, Others). */
     var statuses = [];
@@ -37,12 +43,25 @@ define(['jquery', 'core/log'], function($, Log) {
     /** @var {boolean} Confirmation flag for modal submission. */
     var isConfirmed = false;
 
+    /** @var {Object} Map of selected student objects keyed by student ID. */
+    var selectedStudents = {};
+
+    /** @var {Object} Renderer configuration. */
+    var settings = {};
+
+    /** @var {Object|null} Active Quick Attendance core modal. */
+    var quickModal = null;
+
     /** @var {Object} Localised interface labels supplied by the renderer. */
     var labels = {
         markattendance: 'Select attendance status',
         pagetotal: 'Students on this page',
         setallto: 'Set all: ##STATUS##',
         unmarked: 'Not marked',
+        studentalreadyadded: 'Student with ID number "##ID##" has already been added.',
+        pleaseenteridnumber: 'Please enter one or more student ID numbers.',
+        nostudentsselected: 'No students added yet. Enter one or more ID numbers above and press Enter.',
+        removestudent: 'Remove student',
     };
 
     /** @var {Object} Default unmarked styling. */
@@ -434,41 +453,204 @@ define(['jquery', 'core/log'], function($, Log) {
         html += '</div>';
         html += '</div>';
 
-        $('#attendanceSummaryContent').html(html);
+        Modal.create({
+            title: settings.summarytitle,
+            body: html,
+            footer: settings.summaryfooter,
+            show: true,
+            removeOnClose: true,
+            isVerticallyCentered: true,
+        }).then(function(modal) {
+            modal.getRoot().addClass('att-summary-modal');
+            modal.getRoot().on('click', '#attendanceConfirmSaveBtn', function() {
+                isConfirmed = true;
+                modal.hide();
+                document.getElementById('attendancetakeform').submit();
+            });
+            return modal;
+        }).catch(Notification.exception);
+    }
 
-        var modalEl = document.getElementById('attendanceSummaryModal');
-        if (modalEl) {
-            if (window.bootstrap && window.bootstrap.Modal) {
-                var bsModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-                bsModal.show();
-            } else {
-                $('#attendanceSummaryModal').modal('show');
-            }
+    /**
+     * Show or clear quick attendance error message.
+     *
+     * @param {string} msg
+     */
+    function showQuickError(msg) {
+        var $err = $('#att-quick-error');
+        if (msg) {
+            $err.text(msg).removeClass('d-none');
         } else {
-            // Fallback if modal container is not in DOM
-            isConfirmed = true;
-            document.getElementById('attendancetakeform').submit();
+            $err.text('').addClass('d-none');
         }
+    }
+
+    /**
+     * Render the list of selected students in the quick attendance modal.
+     */
+    function renderSelectedList() {
+        var ids = Object.keys(selectedStudents);
+        var count = ids.length;
+        $('#att-quick-selected-count').text(count);
+
+        var $container = $('#att-quick-items-container');
+        var $emptyMsg = $('#att-quick-empty-msg');
+
+        if (count === 0) {
+            $emptyMsg.removeClass('d-none');
+            $container.empty();
+            return;
+        }
+
+        $emptyMsg.addClass('d-none');
+        var html = '';
+        for (var i = 0; i < ids.length; i++) {
+            var student = selectedStudents[ids[i]];
+            var displayId = student.idnumber ? student.idnumber : ('#' + student.id);
+            html += '<div class="att-quick-student-item d-flex justify-content-between ' +
+                'align-items-center py-1 px-2 border-bottom">';
+            html += '<div class="d-flex align-items-center gap-2 text-truncate me-2">';
+            html += '<span class="badge bg-light text-dark border font-monospace px-2 py-1">' + escapeHtml(displayId) + '</span>';
+            html += '<span class="text-dark small fw-semibold text-truncate">' + escapeHtml(student.name) + '</span>';
+            html += '</div>';
+            html += '<button type="button" class="btn btn-sm btn-link text-danger p-0 att-quick-remove-btn" data-student-id="' +
+                escapeHtml(student.id) + '" title="' + escapeHtml(labels.removestudent) + '" aria-label="' +
+                escapeHtml(labels.removestudent) + '">';
+            html += '<i class="fa fa-times" aria-hidden="true"></i>';
+            html += '</button>';
+            html += '</div>';
+        }
+        $container.html(html);
+    }
+
+    /**
+     * Search and add students by comma- or line-separated ID numbers.
+     *
+     * @param {string} query
+     */
+    function addStudentsByIdNumbers(query) {
+        var raw = $.trim(query);
+        if (!raw) {
+            showQuickError(labels.pleaseenteridnumber);
+            $('#att-quick-idnumber-input').focus();
+            return;
+        }
+
+        var $button = $('#att-quick-add-btn');
+        $button.prop('disabled', true);
+        var request = {
+            methodname: 'mod_attendance_find_student_by_idnumber',
+            args: {
+                cmid: settings.cmid,
+                sessionid: settings.sessionid,
+                grouptype: settings.grouptype,
+                groupid: settings.groupid,
+                idnumber: raw,
+            },
+        };
+
+        Ajax.call([request])[0].then(function(response) {
+            var errors = [];
+            response.students.forEach(function(student) {
+                if (!student.found) {
+                    errors.push(student.message);
+                    return;
+                }
+                if (selectedStudents[student.id]) {
+                    errors.push(labels.studentalreadyadded.replace('##ID##', student.idnumber));
+                    return;
+                }
+                selectedStudents[student.id] = student;
+            });
+
+            showQuickError(errors.join(' '));
+            $('#att-quick-idnumber-input').val('');
+            renderSelectedList();
+        }).catch(Notification.exception).then(function() {
+            $button.prop('disabled', false);
+            $('#att-quick-idnumber-input').focus();
+            return null;
+        });
+    }
+
+    /**
+     * Create and show the Quick Attendance modal using Moodle's modal API.
+     */
+    function showQuickAttendanceModal() {
+        selectedStudents = {};
+        Modal.create({
+            title: settings.quicktitle,
+            body: settings.quickbody,
+            footer: settings.quickfooter,
+            large: true,
+            show: true,
+            removeOnClose: true,
+            isVerticallyCentered: true,
+        }).then(function(modal) {
+            quickModal = modal;
+            modal.getRoot().addClass('att-quick-modal');
+            showQuickError('');
+            renderSelectedList();
+            $('#att-quick-idnumber-input').val('').focus();
+            return modal;
+        }).catch(Notification.exception);
+    }
+
+    /**
+     * Read renderer-owned modal content without serialising it through js_call_amd.
+     *
+     * @param {string} id Template element ID.
+     * @return {string}
+     */
+    function getTemplateContent(id) {
+        var template = document.getElementById(id);
+        return template ? template.innerHTML : '';
+    }
+
+    /**
+     * Read scalar settings and localised labels from the page.
+     *
+     * @return {Object}
+     */
+    function getSettingsFromDom() {
+        var config = document.getElementById('att-take-config');
+        if (!config) {
+            return {};
+        }
+
+        labels = $.extend({}, labels, {
+            markattendance: config.getAttribute('data-label-markattendance'),
+            pagetotal: config.getAttribute('data-label-pagetotal'),
+            setallto: config.getAttribute('data-label-setallto'),
+            unmarked: config.getAttribute('data-label-unmarked'),
+            studentalreadyadded: config.getAttribute('data-label-studentalreadyadded'),
+            pleaseenteridnumber: config.getAttribute('data-label-pleaseenteridnumber'),
+            nostudentsselected: config.getAttribute('data-label-nostudentsselected'),
+            removestudent: config.getAttribute('data-label-removestudent'),
+        });
+
+        return {
+            cmid: Number(config.getAttribute('data-cmid')),
+            sessionid: Number(config.getAttribute('data-sessionid')),
+            grouptype: Number(config.getAttribute('data-grouptype')),
+            groupid: Number(config.getAttribute('data-groupid')),
+            manageurl: config.getAttribute('data-manageurl'),
+            summarytitle: getTemplateContent('att-summary-title-template'),
+            summaryfooter: getTemplateContent('att-summary-footer-template'),
+            quicktitle: getTemplateContent('att-quick-title-template'),
+            quickbody: getTemplateContent('att-quick-body-template'),
+            quickfooter: getTemplateContent('att-quick-footer-template'),
+        };
     }
 
     return {
         /**
          * Initialize attendance take interaction.
-         *
-         * @param {Object|Array} config Optional configuration or statuses array.
          */
-        init: function(config) {
+        init: function() {
             $(document).ready(function() {
-                if (config) {
-                    if (Array.isArray(config)) {
-                        statuses = sortStatusesByPriority(config);
-                    } else if (config.statuses && Array.isArray(config.statuses)) {
-                        statuses = sortStatusesByPriority(config.statuses);
-                    }
-                    if (config.labels) {
-                        labels = $.extend({}, labels, config.labels);
-                    }
-                }
+                settings = getSettingsFromDom();
+                selectedStudents = {};
 
                 if (statuses.length === 0) {
                     statuses = extractStatuses();
@@ -480,6 +662,64 @@ define(['jquery', 'core/log'], function($, Log) {
                 // Global event delegation for Set All button
                 var setAllSelector = '#att-mobile-setall, .att-mobile-setall-btn';
                 $(document).off('click', setAllSelector).on('click', setAllSelector, onSetAllClick);
+
+                // Open Quick Attendance modal.
+                $(document).off('click', '#att-quick-attendance-btn').on('click', '#att-quick-attendance-btn', function(e) {
+                    e.preventDefault();
+                    showQuickAttendanceModal();
+                });
+
+                // Enter key in ID number input
+                $(document).off('keydown', '#att-quick-idnumber-input').on('keydown', '#att-quick-idnumber-input', function(e) {
+                    if (e.which === 13 || e.keyCode === 13) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        addStudentsByIdNumbers($(this).val());
+                    }
+                });
+
+                // Click Add button
+                $(document).off('click', '#att-quick-add-btn').on('click', '#att-quick-add-btn', function(e) {
+                    e.preventDefault();
+                    addStudentsByIdNumbers($('#att-quick-idnumber-input').val());
+                });
+
+                // Click Remove student button
+                $(document).off('click', '.att-quick-remove-btn').on('click', '.att-quick-remove-btn', function(e) {
+                    e.preventDefault();
+                    var sid = $(this).data('student-id');
+                    if (sid && selectedStudents[sid]) {
+                        delete selectedStudents[sid];
+                        renderSelectedList();
+                    }
+                });
+
+                // Save Quick Attendance with a compact, server-validated request.
+                $(document).off('click', '#att-quick-confirm-save-btn').on('click', '#att-quick-confirm-save-btn', function() {
+                    var $button = $(this);
+                    $button.prop('disabled', true);
+                    var request = {
+                        methodname: 'mod_attendance_save_quick_attendance',
+                        args: {
+                            cmid: settings.cmid,
+                            sessionid: settings.sessionid,
+                            grouptype: settings.grouptype,
+                            groupid: settings.groupid,
+                            selectedstudentids: Object.keys(selectedStudents).map(Number),
+                            selectedstatusid: Number($('#att-quick-selected-status').val()),
+                        },
+                    };
+
+                    Ajax.call([request])[0].then(function() {
+                        if (quickModal) {
+                            quickModal.hide();
+                        }
+                        window.location.assign(settings.manageurl);
+                    }).catch(function(error) {
+                        $button.prop('disabled', false);
+                        Notification.exception(error);
+                    });
+                });
 
                 // Two-way synchronization: Listen to underlying radio changes
                 var radioSelector = '#attendancetakeform input[type="radio"]';
@@ -505,23 +745,6 @@ define(['jquery', 'core/log'], function($, Log) {
                         e.preventDefault();
                         showSummaryModal();
                     }
-                });
-
-                // Confirm Save button inside Modal
-                $(document).off('click', '#attendanceConfirmSaveBtn').on('click', '#attendanceConfirmSaveBtn', function() {
-                    isConfirmed = true;
-                    var modalEl = document.getElementById('attendanceSummaryModal');
-                    if (modalEl) {
-                        if (window.bootstrap && window.bootstrap.Modal) {
-                            var bsModal = bootstrap.Modal.getInstance(modalEl);
-                            if (bsModal) {
-                                bsModal.hide();
-                            }
-                        } else {
-                            $('#attendanceSummaryModal').modal('hide');
-                        }
-                    }
-                    document.getElementById('attendancetakeform').submit();
                 });
 
                 Log.debug('mod_attendance: Attendance take handler active with summary modal.');
